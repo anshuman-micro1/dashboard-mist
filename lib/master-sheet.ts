@@ -26,6 +26,46 @@ const fieldAliases = {
   status: ['status✏️', 'status'],
 } as const;
 
+function matchesAnyAlias(value: unknown, aliases: readonly string[]) {
+  const normalized = normalizeLabel(coerceString(value));
+  return aliases.some((alias) => normalized === normalizeLabel(alias));
+}
+
+function isHeaderRow(row: unknown[]) {
+  const hasName = row.some((value) => matchesAnyAlias(value, fieldAliases.name));
+  const hasIdentityColumn = [...fieldAliases.personalEmail, ...fieldAliases.expertEmail].some((alias) =>
+    row.some((value) => normalizeLabel(coerceString(value)) === normalizeLabel(alias)),
+  );
+  const hasMetadataColumn = [...fieldAliases.totalTasks, ...fieldAliases.status].some((alias) =>
+    row.some((value) => normalizeLabel(coerceString(value)) === normalizeLabel(alias)),
+  );
+
+  return hasName && (hasIdentityColumn || hasMetadataColumn);
+}
+
+function sheetToRows(sheet: XLSX.WorkSheet) {
+  const table = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '', raw: true });
+  const headerIndex = table.findIndex(isHeaderRow);
+
+  if (headerIndex < 0) {
+    return XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+  }
+
+  const headers = table[headerIndex].map((value) => coerceString(value));
+
+  return table.slice(headerIndex + 1).map((values) => {
+    const row: Record<string, unknown> = {};
+
+    headers.forEach((header, index) => {
+      if (header) {
+        row[header] = values[index] ?? '';
+      }
+    });
+
+    return row;
+  });
+}
+
 function pickValue(row: Record<string, unknown>, aliases: readonly string[]) {
   const normalizedEntries = Object.entries(row).map(([key, value]) => [normalizeLabel(key), value] as const);
   const normalizedLookup = new Map(normalizedEntries);
@@ -48,11 +88,11 @@ export function parseMasterSheet(buffer: ArrayBuffer, fileName: string): ExpertR
     const text = Buffer.from(buffer).toString('utf8');
     const workbook = XLSX.read(text, { type: 'string', raw: true });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+    rows = sheetToRows(sheet);
   } else {
     const workbook = XLSX.read(Buffer.from(buffer), { type: 'buffer' });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+    rows = sheetToRows(sheet);
   }
 
   return rows

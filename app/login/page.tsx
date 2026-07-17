@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { LoginForm } from '@/components/login-form';
 import { getSessionUserFromCookies } from '@/lib/auth';
@@ -25,15 +24,14 @@ export default async function LoginPage({ searchParams }: { searchParams?: Promi
               A sharper dashboard for expert elapsed time.
             </h1>
             <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">
-              Import your master sheet, sync Hubstaff exports from the credentials in .env, and track elapsed time by
-              expert in one place.
+              Review expert time, track progress, and resolve unmatched hours from one focused workspace.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             {[
-              ['Secure access', 'Username/password login'],
-              ['MongoDB-backed', 'Experts and exports stored centrally'],
-              ['Fast review', 'See totals, activity, and sync status'],
+              ['Secure access', 'Sign in to continue'],
+              ['Clear matching', 'Keep expert records aligned'],
+              ['Fast review', 'See totals, activity, and status'],
             ].map(([title, description]) => (
               <div key={title} className="glass-panel rounded-[1.5rem] p-4">
                 <div className="text-sm font-semibold text-white">{title}</div>
@@ -41,16 +39,13 @@ export default async function LoginPage({ searchParams }: { searchParams?: Promi
               </div>
             ))}
           </div>
-          <Link href="/import" className="inline-flex rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
-            Go to import tools
-          </Link>
         </section>
 
         <section className="glass-panel rounded-[2rem] p-6 sm:p-8">
           <div>
             <p className="text-sm uppercase tracking-[0.3em] text-[#67d4ff]">Sign in</p>
             <h2 className="mt-2 text-3xl font-semibold text-white">Access the dashboard</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-300">Use the credentials from the environment file.</p>
+            <p className="mt-3 text-sm leading-6 text-slate-300">Enter your account details to continue.</p>
           </div>
           <div className="mt-8">
             <LoginForm nextPath={nextPath} />

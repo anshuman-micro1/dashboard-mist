@@ -13,6 +13,14 @@ export async function POST(request: Request) {
 
     const buffer = await file.arrayBuffer();
     const experts = parseMasterSheet(buffer, file.name);
+
+    if (!experts.length) {
+      return NextResponse.json(
+        { error: 'No expert rows were found. Check that the file includes Name, Personal Email, or Expert Email columns.' },
+        { status: 400 },
+      );
+    }
+
     const db = await getDb();
 
     await db.collection('experts').deleteMany({});

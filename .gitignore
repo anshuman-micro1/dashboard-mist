@@ -2,6 +2,7 @@
 node_modules
 out
 coverage
+hubstaff-exports
 .env.local
 .env.production
 .env.development
@@ -11,3 +12,4 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 *.env
+temp

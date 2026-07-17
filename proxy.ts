@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 
-const protectedPrefixes = ['/dashboard', '/import', '/settings', '/api/hubstaff', '/api/master-sheet', '/api/settings'];
+const protectedPrefixes = ['/dashboard', '/import', '/settings', '/unmatched', '/api/hubstaff', '/api/master-sheet', '/api/settings', '/api/unmatched'];
 const authTokenName = 'mist_auth_token';
 const tokenSecret = new TextEncoder().encode(process.env.JWT_SECRET || 'development-only-secret');
 
@@ -44,5 +44,14 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/import/:path*', '/settings/:path*', '/api/hubstaff/:path*', '/api/master-sheet/:path*', '/api/settings/:path*'],
+  matcher: [
+    '/dashboard/:path*',
+    '/import/:path*',
+    '/settings/:path*',
+    '/unmatched/:path*',
+    '/api/hubstaff/:path*',
+    '/api/master-sheet/:path*',
+    '/api/settings/:path*',
+    '/api/unmatched/:path*',
+  ],
 };

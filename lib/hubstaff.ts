@@ -40,6 +40,13 @@ function pickValue(row: Record<string, unknown>, aliases: string[]) {
   return '';
 }
 
+function shouldExcludeHubstaffPerson(name: string, email = '') {
+  const excludedNames = new Set(['anshumannayak']);
+  const excludedEmails = new Set<string>();
+
+  return excludedNames.has(normalizeLabel(name)) || excludedEmails.has(normalizeLabel(email));
+}
+
 function buildCookieHeader(credentials: HubstaffCredentials, rawCookieHeader = '') {
   if (rawCookieHeader) {
     return rawCookieHeader;
@@ -175,6 +182,10 @@ function parseWideDailyRows(rows: Record<string, unknown>[]): HubstaffEntry[] {
     const project = coerceString(pickValue(row, ['project', 'project name']));
     const activity = coerceNumber(pickValue(row, ['activity', 'activity percentage', 'activity %']));
 
+    if ((!name && !email) || shouldExcludeHubstaffPerson(name, email)) {
+      return [];
+    }
+
     return dateColumns
       .map((date) => {
         const elapsedMinutes = parseDurationToMinutes(row[date]);
@@ -247,7 +258,7 @@ export function parseHubstaffCsv(csvText: string): HubstaffEntry[] {
       const breakMinutes = parseDurationToMinutes(pickValue(row, ['break time', 'break', 'break minutes']));
       const manualMinutes = parseDurationToMinutes(pickValue(row, ['manual', 'manual time']));
 
-      if (!date && !name && !email) {
+      if ((!date && !name && !email) || shouldExcludeHubstaffPerson(name, email)) {
         return null;
       }
 
