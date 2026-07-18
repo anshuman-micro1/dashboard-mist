@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { DailySnapshot, type DailySnapshotFilters, type DailySnapshotItem } from '@/components/daily-snapshot';
 import { ElapsedChart } from '@/components/elapsed-chart';
 import { getSessionUserFromCookies } from '@/lib/auth';
 import { getDashboardSnapshot, minutesToDisplay, type DashboardDayBreakdown } from '@/lib/dashboard';
@@ -12,6 +13,61 @@ function defaultDateRange() {
 
 function ahtDisplay(value: number | null) {
   return value === null ? '—' : `${value.toFixed(2)}h`;
+}
+
+function minutesToClock(minutes: number) {
+  const safeMinutes = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(safeMinutes / 60);
+  const remainder = safeMinutes % 60;
+
+  return `${hours}:${String(remainder).padStart(2, '0')}:00`;
+}
+
+function buildDailySnapshots(rows: Awaited<ReturnType<typeof getDashboardSnapshot>>['rows']): Map<string, DailySnapshotItem> {
+  const days = new Map<string, { activeExperts: number; elapsedMinutes: number; weightedActivity: number }>();
+
+  for (const row of rows) {
+    for (const day of row.dayBreakdown) {
+      if (day.elapsedMinutes <= 0) {
+        continue;
+      }
+
+      const existing = days.get(day.date) || {
+        activeExperts: 0,
+        elapsedMinutes: 0,
+        weightedActivity: 0,
+      };
+
+      existing.activeExperts += 1;
+      existing.elapsedMinutes += day.elapsedMinutes;
+      existing.weightedActivity += day.activityAverage * day.elapsedMinutes;
+      days.set(day.date, existing);
+    }
+  }
+
+  return new Map(
+    [...days.entries()]
+      .sort(([left], [right]) => right.localeCompare(left))
+      .map(([date, day]) => {
+        const averageMinutesPerExpert = day.activeExperts ? day.elapsedMinutes / day.activeExperts : 0;
+        const averageActivity = day.elapsedMinutes ? Math.round(day.weightedActivity / day.elapsedMinutes) : 0;
+        const metrics = [
+          { label: 'Total Active Experts', value: String(day.activeExperts) },
+          { label: 'Total Time Tracked', value: minutesToClock(day.elapsedMinutes) },
+          { label: 'Average per Expert', value: minutesToClock(averageMinutesPerExpert) },
+          { label: 'Average Activity Level', value: `${averageActivity}%` },
+        ];
+
+        return [
+          date,
+          {
+            date,
+            metrics,
+            lines: [`Date: ${date}`, ...metrics.map((metric) => `${metric.label}: ${metric.value}`)],
+          },
+        ];
+      }),
+  );
 }
 
 function SortMarker({ active, direction }: { active: boolean; direction: 'asc' | 'desc' }) {
@@ -66,6 +122,7 @@ export default async function DashboardPage({
     ahtTarget?: string;
     sort?: string;
     dir?: string;
+    snapshotDate?: string;
   }>;
 }) {
   const session = await getSessionUserFromCookies();
@@ -94,6 +151,21 @@ export default async function DashboardPage({
 
   const totalElapsed = minutesToDisplay(snapshot.summary.totalElapsedMinutes);
   const unmatched = minutesToDisplay(snapshot.summary.unmatchedMinutes);
+  const dailySnapshots = buildDailySnapshots(snapshot.rows);
+  const latestSnapshotDate = dailySnapshots.keys().next().value || '';
+  const selectedSnapshotDate = resolvedSearchParams.snapshotDate || latestSnapshotDate;
+  const selectedDailySnapshot = dailySnapshots.get(selectedSnapshotDate) || null;
+  const dailySnapshotFilters: DailySnapshotFilters = {
+    from,
+    to,
+    q: query,
+    status: snapshot.filters.status,
+    time: snapshot.filters.time,
+    aht: snapshot.filters.aht,
+    ahtTarget: snapshot.filters.ahtTargetHours,
+    sort: snapshot.filters.sort,
+    dir: snapshot.filters.direction,
+  };
 
   return (
     <main className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
@@ -144,6 +216,8 @@ export default async function DashboardPage({
             </article>
           ))}
         </section>
+
+        <DailySnapshot snapshot={selectedDailySnapshot} selectedDate={selectedSnapshotDate} filters={dailySnapshotFilters} />
 
         <section className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
           <article className="glass-panel rounded-[2rem] p-6 sm:p-7">
