@@ -3,16 +3,22 @@ import { NextResponse } from 'next/server';
 import { getHubstaffIdentityKey } from '@/lib/dashboard';
 import { getDb } from '@/lib/mongodb';
 
-function redirectToUnmatched(request: Request, params: Record<string, string>) {
-  const url = new URL('/unmatched', request.url);
+function redirectToUnmatched(params: Record<string, string>) {
+  const searchParams = new URLSearchParams();
 
   for (const [key, value] of Object.entries(params)) {
     if (value) {
-      url.searchParams.set(key, value);
+      searchParams.set(key, value);
     }
   }
 
-  return NextResponse.redirect(url);
+  const query = searchParams.toString();
+  return new NextResponse(null, {
+    status: 303,
+    headers: {
+      Location: `/unmatched${query ? `?${query}` : ''}`,
+    },
+  });
 }
 
 export async function POST(request: Request) {
@@ -24,18 +30,18 @@ export async function POST(request: Request) {
   const to = String(formData.get('to') || '');
 
   if (!hubstaffName && !hubstaffEmail) {
-    return redirectToUnmatched(request, { from, to, error: 'Cannot assign a blank Hubstaff identity.' });
+    return redirectToUnmatched({ from, to, error: 'Cannot assign a blank Hubstaff identity.' });
   }
 
   if (!ObjectId.isValid(expertId)) {
-    return redirectToUnmatched(request, { from, to, error: 'Choose a valid expert before assigning.' });
+    return redirectToUnmatched({ from, to, error: 'Choose a valid expert before assigning.' });
   }
 
   const db = await getDb();
   const expert = await db.collection('experts').findOne({ _id: new ObjectId(expertId) });
 
   if (!expert) {
-    return redirectToUnmatched(request, { from, to, error: 'Selected expert was not found.' });
+    return redirectToUnmatched({ from, to, error: 'Selected expert was not found.' });
   }
 
   const identityKey = getHubstaffIdentityKey(hubstaffName, hubstaffEmail);
@@ -60,5 +66,5 @@ export async function POST(request: Request) {
     { upsert: true },
   );
 
-  return redirectToUnmatched(request, { from, to, assigned: '1' });
+  return redirectToUnmatched({ from, to, assigned: '1' });
 }
