@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { SlackMessageComposer, type SlackMessageExpert } from '@/components/slack-message-composer';
+import { getAhtReviewExpertKey, getAhtReviewStateKey, getAhtReviewStates } from '@/lib/aht-review';
 import { getSessionUserFromCookies } from '@/lib/auth';
 import { defaultDateRange } from '@/lib/date-range';
 import { getDashboardSnapshot, minutesToDisplay } from '@/lib/dashboard';
@@ -20,6 +21,7 @@ function elapsedHours(minutes: number) {
 function toSlackMessageExpert(row: (Awaited<ReturnType<typeof getDashboardSnapshot>>['rows'])[number], reason: SlackMessageExpert['reason']): SlackMessageExpert {
   return {
     name: row.name || 'Unnamed expert',
+    expertKey: getAhtReviewExpertKey(row),
     personalEmail: row.personalEmail,
     expertEmail: row.expertEmail,
     status: row.status || 'Unknown',
@@ -30,6 +32,7 @@ function toSlackMessageExpert(row: (Awaited<ReturnType<typeof getDashboardSnapsh
     ahtHours: row.ahtHours,
     latestDate: row.latestDate || 'N/A',
     reason,
+    contactedAt: null,
   };
 }
 
@@ -73,11 +76,23 @@ export default async function AhtReviewPage({
     .filter((row) => row.totalTasks === 0 && elapsedHours(row.elapsedMinutes) > safeThresholdHours)
     .sort((left, right) => right.elapsedMinutes - left.elapsedMinutes);
   const ahtReviewRows = snapshot.rows.filter((row) => row.ahtHours !== null && row.ahtHours > safeThresholdHours);
-  const overFiveCount = ahtReviewRows.filter((row) => row.ahtHours !== null && row.ahtHours > 5).length;
-  const thresholdToFiveCount = ahtReviewRows.filter((row) => row.ahtHours !== null && row.ahtHours > safeThresholdHours && row.ahtHours < 5).length;
+  const reviewExpertKeys = [...highPriorityRows, ...ahtReviewRows].map((row) => getAhtReviewExpertKey(row));
+  const reviewStates = await getAhtReviewStates(reviewExpertKeys);
+  const visibleHighPriorityRows = highPriorityRows.filter((row) => !reviewStates.get(getAhtReviewStateKey(getAhtReviewExpertKey(row), 'no-tasks'))?.resolvedAt);
+  const visibleAhtReviewRows = ahtReviewRows.filter((row) => !reviewStates.get(getAhtReviewStateKey(getAhtReviewExpertKey(row), 'aht'))?.resolvedAt);
+  const overFiveCount = visibleAhtReviewRows.filter((row) => row.ahtHours !== null && row.ahtHours > 5).length;
+  const thresholdToFiveCount = visibleAhtReviewRows.filter((row) => row.ahtHours !== null && row.ahtHours > safeThresholdHours && row.ahtHours < 5).length;
   const yellowBandLabel = safeThresholdHours < 5 ? `Between ${hourDisplay(safeThresholdHours)} and 5h` : 'Yellow range';
-  const highPriorityMessageExperts = highPriorityRows.map((row) => toSlackMessageExpert(row, 'no-tasks'));
-  const ahtMessageExperts = ahtReviewRows.map((row) => toSlackMessageExpert(row, 'aht'));
+  const highPriorityMessageExperts = visibleHighPriorityRows.map((row) => {
+    const expert = toSlackMessageExpert(row, 'no-tasks');
+    const state = reviewStates.get(getAhtReviewStateKey(expert.expertKey, 'no-tasks'));
+    return { ...expert, contactedAt: state?.contactedAt || null };
+  });
+  const ahtMessageExperts = visibleAhtReviewRows.map((row) => {
+    const expert = toSlackMessageExpert(row, 'aht');
+    const state = reviewStates.get(getAhtReviewStateKey(expert.expertKey, 'aht'));
+    return { ...expert, contactedAt: state?.contactedAt || null };
+  });
 
   return (
     <main className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
@@ -153,8 +168,8 @@ export default async function AhtReviewPage({
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           {[
-            [`Experts above ${hourDisplay(safeThresholdHours)}`, String(ahtReviewRows.length), 'Experts requiring AHT review'],
-            ['High priority pings', String(highPriorityRows.length), `No-task experts above ${hourDisplay(safeThresholdHours)} elapsed`],
+            [`Experts above ${hourDisplay(safeThresholdHours)}`, String(visibleAhtReviewRows.length), 'Experts requiring AHT review'],
+            ['High priority pings', String(visibleHighPriorityRows.length), `No-task experts above ${hourDisplay(safeThresholdHours)} elapsed`],
             ['Above 5h', String(overFiveCount), 'Marked red in the review table'],
             [yellowBandLabel, String(thresholdToFiveCount), 'Marked yellow in the review table'],
             ['Production AHT', ahtDisplay(snapshot.summary.productionAhtHours), 'Elapsed hours per task for production experts'],
@@ -167,7 +182,7 @@ export default async function AhtReviewPage({
           ))}
         </section>
 
-        <SlackMessageComposer ahtExperts={ahtMessageExperts} highPriorityExperts={highPriorityMessageExperts} thresholdHours={safeThresholdHours} />
+        <SlackMessageComposer ahtExperts={ahtMessageExperts} highPriorityExperts={highPriorityMessageExperts} thresholdHours={safeThresholdHours} from={from} to={to} />
       </div>
     </main>
   );
