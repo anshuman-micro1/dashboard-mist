@@ -21,6 +21,7 @@ export type DashboardRow = {
   expertEmail: string;
   totalTasks: number;
   removedFromOnboardingChannel: boolean;
+  inProduction: boolean;
   status: string;
   elapsedMinutes: number;
   activityAverage: number;
@@ -48,6 +49,8 @@ export type DashboardSnapshot = {
     totalElapsedMinutes: number;
     totalExperts: number;
     expertsWithTime: number;
+    expertsInProduction: number;
+    productionAhtHours: number | null;
     unmatchedMinutes: number;
     averageActivity: number;
   };
@@ -324,6 +327,10 @@ function sortRows(rows: DashboardRow[], sort: DashboardSortKey, direction: Dashb
   });
 }
 
+function isActiveStatus(status: string) {
+  return normalizeSearch(status) === 'active';
+}
+
 export async function getDashboardSnapshot(params: DashboardSnapshotParams) {
   const { db, experts, entries, assignments } = await getDashboardSourceData(params.from, params.to);
 
@@ -353,6 +360,9 @@ export async function getDashboardSnapshot(params: DashboardSnapshotParams) {
     const manualMinutes = matched.reduce((sum, entry) => sum + Number(entry.manualMinutes || 0), 0);
     const totalTasks = Number(expert.totalTasks || 0);
     const ahtHours = totalTasks > 0 ? Number((elapsedMinutes / 60 / totalTasks).toFixed(2)) : null;
+    const status = String(expert.status || 'Unknown');
+    const removedFromOnboardingChannel = Boolean(expert.removedFromOnboardingChannel);
+    const inProduction = isActiveStatus(status) && removedFromOnboardingChannel;
     const dayBreakdown = buildDayBreakdown(matched);
     const averageActivity = elapsedMinutes
       ? matched.reduce((sum, entry) => sum + Number(entry.activity || 0) * Number(entry.elapsedMinutes || 0), 0) / elapsedMinutes
@@ -372,8 +382,9 @@ export async function getDashboardSnapshot(params: DashboardSnapshotParams) {
       personalEmail,
       expertEmail,
       totalTasks,
-      removedFromOnboardingChannel: Boolean(expert.removedFromOnboardingChannel),
-      status: String(expert.status || 'Unknown'),
+      removedFromOnboardingChannel,
+      inProduction,
+      status,
       elapsedMinutes,
       activityAverage: Number(averageActivity.toFixed(1)),
       breakMinutes,
@@ -422,12 +433,21 @@ export async function getDashboardSnapshot(params: DashboardSnapshotParams) {
       if (row.elapsedMinutes > 0) {
         accumulator.expertsWithTime += 1;
       }
+      if (row.inProduction) {
+        accumulator.expertsInProduction += 1;
+        accumulator.productionElapsedMinutes += row.elapsedMinutes;
+        accumulator.productionTasks += row.totalTasks;
+      }
       return accumulator;
     },
     {
       totalElapsedMinutes: 0,
       totalExperts: filteredRows.length,
       expertsWithTime: 0,
+      expertsInProduction: 0,
+      productionElapsedMinutes: 0,
+      productionTasks: 0,
+      productionAhtHours: null as number | null,
       expertsWithActivity: 0,
       unmatchedMinutes: unmatchedEntries.reduce((sum, entry) => sum + Number(entry.elapsedMinutes || 0), 0),
       averageActivity: 0,
@@ -436,6 +456,9 @@ export async function getDashboardSnapshot(params: DashboardSnapshotParams) {
 
   if (summary.expertsWithActivity) {
     summary.averageActivity = Number((summary.averageActivity / summary.expertsWithActivity).toFixed(1));
+  }
+  if (summary.productionTasks > 0) {
+    summary.productionAhtHours = Number((summary.productionElapsedMinutes / 60 / summary.productionTasks).toFixed(2));
   }
 
   return {

@@ -1,13 +1,8 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSessionUserFromCookies } from '@/lib/auth';
+import { defaultDateRange } from '@/lib/date-range';
 import { getUnmatchedLedgerSnapshot, minutesToDisplay, type DashboardDayBreakdown } from '@/lib/dashboard';
-
-function defaultDateRange() {
-  const end = process.env.REPORT_DATE_END || new Date().toISOString().slice(0, 10);
-  const start = process.env.REPORT_DATE_START || new Date(Date.now() - 1000 * 60 * 60 * 24 * 14).toISOString().slice(0, 10);
-  return { start, end };
-}
 
 function DayBreakdownTable({ days }: { days: DashboardDayBreakdown[] }) {
   if (!days.length) {

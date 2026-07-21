@@ -17,7 +17,16 @@ const fieldAliases = {
   name: ['name🤖', 'name'],
   personalEmail: ['personalemail🤖', 'personalemail', 'personal email'],
   expertEmail: ['expertemail🤖', 'expertemail', 'expert email'],
-  totalTasks: ['totaltasks🤖', 'totaltasks', 'total tasks'],
+  totalTasks: [
+    'totaltasks🤖',
+    'totaltaskssubmitted🤖',
+    'totaltasks',
+    'total tasks',
+    'total tasks submitted',
+    'tasks submitted',
+    'submitted tasks',
+    'tasks',
+  ],
   removedFromOnboardingChannel: [
     '❌removedfromonboardingchannel',
     'removedfromonboardingchannel',

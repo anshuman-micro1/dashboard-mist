@@ -3,13 +3,8 @@ import { redirect } from 'next/navigation';
 import { DailySnapshot, type DailySnapshotFilters, type DailySnapshotItem } from '@/components/daily-snapshot';
 import { ElapsedChart } from '@/components/elapsed-chart';
 import { getSessionUserFromCookies } from '@/lib/auth';
+import { defaultDateRange } from '@/lib/date-range';
 import { getDashboardSnapshot, minutesToDisplay, type DashboardDayBreakdown } from '@/lib/dashboard';
-
-function defaultDateRange() {
-  const end = process.env.REPORT_DATE_END || new Date().toISOString().slice(0, 10);
-  const start = process.env.REPORT_DATE_START || new Date(Date.now() - 1000 * 60 * 60 * 24 * 14).toISOString().slice(0, 10);
-  return { start, end };
-}
 
 function ahtDisplay(value: number | null) {
   return value === null ? '—' : `${value.toFixed(2)}h`;
@@ -190,6 +185,9 @@ export default async function DashboardPage({
               <Link href={`/unmatched?from=${from}&to=${to}`} className="rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/5">
                 Unmatched ledger
               </Link>
+              <Link href={`/aht-review?from=${from}&to=${to}`} className="rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/5">
+                AHT review
+              </Link>
               <Link href="/settings" className="rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/5">
                 Hubstaff settings
               </Link>
@@ -202,11 +200,13 @@ export default async function DashboardPage({
           </div>
         </header>
 
-        <section className="grid gap-4 lg:grid-cols-4">
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
           {[
             ['Total elapsed', totalElapsed.short, 'Hubstaff minutes in the selected range'],
             ['Experts tracked', String(snapshot.summary.totalExperts), 'Matched master sheet rows'],
             ['Experts with time', String(snapshot.summary.expertsWithTime), 'People with elapsed time recorded'],
+            ['Experts in production', String(snapshot.summary.expertsInProduction), 'Active experts removed from onboarding'],
+            ['Production AHT', ahtDisplay(snapshot.summary.productionAhtHours), 'Elapsed hours per task for production experts'],
             ['Unmatched minutes', unmatched.short, 'Hubstaff rows not matched to the master sheet'],
           ].map(([label, value, description]) => (
             <article key={label} className="glass-panel rounded-[1.75rem] p-5">
@@ -365,6 +365,7 @@ export default async function DashboardPage({
                   <th className="px-6 py-4 font-medium">Expert <SortMarker active={snapshot.filters.sort === 'name'} direction={snapshot.filters.direction} /></th>
                   <th className="px-6 py-4 font-medium">Contacts</th>
                   <th className="px-6 py-4 font-medium">Status <SortMarker active={snapshot.filters.sort === 'status'} direction={snapshot.filters.direction} /></th>
+                  <th className="px-6 py-4 font-medium">In Production</th>
                   <th className="px-6 py-4 font-medium">Tasks <SortMarker active={snapshot.filters.sort === 'tasks'} direction={snapshot.filters.direction} /></th>
                   <th className="px-6 py-4 font-medium">Elapsed <SortMarker active={snapshot.filters.sort === 'elapsed'} direction={snapshot.filters.direction} /></th>
                   <th className="px-6 py-4 font-medium">AHT <SortMarker active={snapshot.filters.sort === 'aht'} direction={snapshot.filters.direction} /></th>
@@ -383,13 +384,13 @@ export default async function DashboardPage({
                         </summary>
                         <DayBreakdownTable days={row.dayBreakdown} />
                       </details>
-                      <div className="mt-1 text-xs text-slate-400">{row.removedFromOnboardingChannel ? 'Removed from onboarding channel' : 'Active in onboarding channel'}</div>
                     </td>
                     <td className="px-6 py-4 text-slate-300">
                       <div>{row.personalEmail || '—'}</div>
                       <div className="text-xs text-slate-500">{row.expertEmail || '—'}</div>
                     </td>
                     <td className="px-6 py-4 text-slate-300">{row.status || 'Unknown'}</td>
+                    <td className="px-6 py-4 text-slate-300">{row.inProduction ? 'Yes' : 'No'}</td>
                     <td className="px-6 py-4 text-slate-300">{row.totalTasks}</td>
                     <td className="px-6 py-4 font-semibold text-white">{minutesToDisplay(row.elapsedMinutes).short}</td>
                     <td className="px-6 py-4 text-slate-300">{ahtDisplay(row.ahtHours)}</td>
@@ -400,7 +401,7 @@ export default async function DashboardPage({
                 ))}
                 {!snapshot.rows.length ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-10 text-center text-slate-400">
+                    <td colSpan={10} className="px-6 py-10 text-center text-slate-400">
                       No experts matched this filter yet.
                     </td>
                   </tr>

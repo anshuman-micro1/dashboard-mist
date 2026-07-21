@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
+import { defaultDateRange } from '@/lib/date-range';
 import { getDb } from '@/lib/mongodb';
 import { fetchHubstaffDailyCsv, parseHubstaffCsv } from '@/lib/hubstaff';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
-    const from = String(body?.from || process.env.REPORT_DATE_START || new Date().toISOString().slice(0, 10));
-    const to = String(body?.to || process.env.REPORT_DATE_END || new Date().toISOString().slice(0, 10));
+    const defaults = defaultDateRange();
+    const from = String(body?.from || defaults.start);
+    const to = String(body?.to || defaults.end);
 
     const csv = await fetchHubstaffDailyCsv(from, to);
     const entries = parseHubstaffCsv(csv);

@@ -2,12 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { ImportPanel } from '@/components/import-panel';
 import { getSessionUserFromCookies } from '@/lib/auth';
-
-function defaultDateRange() {
-  const end = process.env.REPORT_DATE_END || new Date().toISOString().slice(0, 10);
-  const start = process.env.REPORT_DATE_START || new Date(Date.now() - 1000 * 60 * 60 * 24 * 14).toISOString().slice(0, 10);
-  return { start, end };
-}
+import { defaultDateRange } from '@/lib/date-range';
 
 export default async function ImportPage() {
   const session = await getSessionUserFromCookies();
