@@ -22,20 +22,34 @@ export async function POST(request: Request) {
     }
 
     const db = await getDb();
+    const expertsByKey = new Map(experts.map((expert) => [expert.expertKey, expert]));
+    const uniqueExperts = [...expertsByKey.values()];
+    const expertKeys = uniqueExperts.map((expert) => expert.expertKey);
 
-    await db.collection('experts').deleteMany({});
-    if (experts.length) {
-      await db.collection('experts').insertMany(experts);
-    }
+    await db.collection('experts').bulkWrite(
+      uniqueExperts.map((expert) => ({
+        updateOne: {
+          filter: { expertKey: expert.expertKey },
+          update: {
+            $set: expert,
+            $setOnInsert: {
+              createdAt: new Date(),
+            },
+          },
+          upsert: true,
+        },
+      })),
+    );
+    await db.collection('experts').deleteMany({ expertKey: { $nin: expertKeys } });
 
     await db.collection('sync_runs').insertOne({
       source: 'Master Sheet',
       type: 'master-sheet',
-      count: experts.length,
+      count: uniqueExperts.length,
       importedAt: new Date(),
     });
 
-    return NextResponse.json({ ok: true, imported: experts.length });
+    return NextResponse.json({ ok: true, imported: uniqueExperts.length });
   } catch (error) {
     return NextResponse.json(
       {

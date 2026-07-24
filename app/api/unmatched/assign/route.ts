@@ -1,6 +1,7 @@
 import { ObjectId } from 'mongodb';
 import { NextResponse } from 'next/server';
 import { getHubstaffIdentityKey } from '@/lib/dashboard';
+import { getExpertIdentityKey } from '@/lib/expert-identity';
 import { getDb } from '@/lib/mongodb';
 
 function redirectToUnmatched(params: Record<string, string>) {
@@ -45,6 +46,13 @@ export async function POST(request: Request) {
   }
 
   const identityKey = getHubstaffIdentityKey(hubstaffName, hubstaffEmail);
+  const expertKey =
+    String(expert.expertKey || '') ||
+    getExpertIdentityKey({
+      name: String(expert.name || ''),
+      personalEmail: String(expert.personalEmail || ''),
+      expertEmail: String(expert.expertEmail || ''),
+    });
   const assignedAt = new Date();
 
   await db.collection('hubstaff_assignments').updateOne(
@@ -54,6 +62,7 @@ export async function POST(request: Request) {
         identityKey,
         hubstaffName,
         hubstaffEmail,
+        expertKey,
         expertId: new ObjectId(expertId),
         expertName: String(expert.name || ''),
         expertEmail: String(expert.expertEmail || expert.personalEmail || ''),

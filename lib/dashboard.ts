@@ -1,4 +1,5 @@
 import { getDb } from '@/lib/mongodb';
+import { getExpertIdentityKey, getPossibleExpertIdentityKeys } from '@/lib/expert-identity';
 import { formatMinutes, normalizeSearch } from '@/lib/parsers';
 
 export type DashboardSortKey = 'elapsed' | 'name' | 'tasks' | 'aht' | 'activity' | 'days' | 'latestDate' | 'status';
@@ -148,12 +149,32 @@ function namesLikelyMatch(left: string, right: string) {
   );
 }
 
-function entryMatchesAssignment(entry: Record<string, unknown>, expert: Record<string, unknown>, assignments: Map<string, string>) {
-  const assignedExpertId = assignments.get(getHubstaffIdentityKey(String(entry.name || ''), String(entry.email || '')));
-  return Boolean(assignedExpertId && assignedExpertId === String(expert._id || ''));
+type HubstaffAssignment = {
+  expertId: string;
+  expertKey: string;
+};
+
+function entryMatchesAssignment(entry: Record<string, unknown>, expert: Record<string, unknown>, assignments: Map<string, HubstaffAssignment>) {
+  const assignment = assignments.get(getHubstaffIdentityKey(String(entry.name || ''), String(entry.email || '')));
+
+  if (!assignment) {
+    return false;
+  }
+
+  if (assignment.expertId && assignment.expertId === String(expert._id || '')) {
+    return true;
+  }
+
+  const expertKeys = getPossibleExpertIdentityKeys({
+    name: String(expert.name || ''),
+    personalEmail: String(expert.personalEmail || ''),
+    expertEmail: String(expert.expertEmail || ''),
+  });
+
+  return Boolean(assignment.expertKey && expertKeys.includes(assignment.expertKey));
 }
 
-function entryMatchesExpert(entry: Record<string, unknown>, expert: Record<string, unknown>, assignments = new Map<string, string>()) {
+function entryMatchesExpert(entry: Record<string, unknown>, expert: Record<string, unknown>, assignments = new Map<string, HubstaffAssignment>()) {
   if (entryMatchesAssignment(entry, expert, assignments)) {
     return true;
   }
@@ -265,7 +286,16 @@ async function getHubstaffAssignments() {
   return new Map(
     documents.map((document) => [
       getHubstaffIdentityKey(String(document.hubstaffName || ''), String(document.hubstaffEmail || '')),
-      String(document.expertId || ''),
+      {
+        expertId: String(document.expertId || ''),
+        expertKey:
+          String(document.expertKey || '') ||
+          getExpertIdentityKey({
+            name: String(document.expertName || ''),
+            personalEmail: '',
+            expertEmail: String(document.expertEmail || ''),
+          }),
+      },
     ]),
   );
 }

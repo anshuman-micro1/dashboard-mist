@@ -1,7 +1,9 @@
 import * as XLSX from 'xlsx';
+import { getExpertIdentityKey } from '@/lib/expert-identity';
 import { coerceBoolean, coerceNumber, coerceString, normalizeLabel } from '@/lib/parsers';
 
 export type ExpertRecord = {
+  expertKey: string;
   name: string;
   personalEmail: string;
   expertEmail: string;
@@ -118,6 +120,7 @@ export function parseMasterSheet(buffer: ArrayBuffer, fileName: string): ExpertR
       }
 
       return {
+        expertKey: getExpertIdentityKey({ name, personalEmail, expertEmail }),
         name,
         personalEmail,
         expertEmail,
